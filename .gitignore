@@ -1,0 +1,41 @@
+# macOS system files
+.DS_Store
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database files - НИКОГДА не коммитим базы данных!
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables - храним отдельно!
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
