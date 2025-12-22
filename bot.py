@@ -223,7 +223,6 @@ async def all_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Ошибка")
 
 async def all_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Последний вес каждого пользователя с эмодзи"""
     try:
         cursor = database.db.conn.cursor()
         cursor.execute('SELECT id, first_name FROM users')
@@ -233,55 +232,97 @@ async def all_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📭 Нет пользователей")
             return
         
+        today = datetime.date.today().isoformat()
         response = "⚖️ ТЕКУЩИЙ ВЕС:\n\n"
         
         for user_id, name in users:
-            # Последний вес
+            cursor.execute('''
+                SELECT weight, date FROM measurements 
+                WHERE user_id = ? AND weight IS NOT NULL AND date = ?
+                ORDER BY created_at DESC LIMIT 1
+            ''', (user_id, today))
+            
+            today_weight = cursor.fetchone()
+
             cursor.execute('''
                 SELECT weight, date FROM measurements 
                 WHERE user_id = ? AND weight IS NOT NULL
                 ORDER BY date DESC, created_at DESC LIMIT 1
             ''', (user_id,))
             
-            result = cursor.fetchone()
-            if not result:
+            last_result = cursor.fetchone()
+            
+            if not last_result:
+                response += f"{name}: ❌ нет данных\n"
                 continue
                 
-            weight, date = result
-            
-            # Предыдущий вес
+            weight, last_date = last_result
+            is_today = (last_date == today)
+
+            if is_today:
+                status_emoji = "🟢"  # Зеленый кружок - вес обновлен сегодня
+            else:
+                status_emoji = "🔴"  # Красный кружок - вес не обновлен сегодня
+
             cursor.execute('''
                 SELECT weight FROM measurements 
                 WHERE user_id = ? AND weight IS NOT NULL AND date != ?
                 ORDER BY date DESC, created_at DESC LIMIT 1
-            ''', (user_id, date))
+            ''', (user_id, last_date))
             
             prev = cursor.fetchone()
             
+            change_text = ""
             if prev:
                 change = weight - prev[0]
-                
-                # Определяем эмодзи и текст
+
                 if change < -0.1:  # Похудение (>0.1 кг)
-                    emoji = "🔽"
-                    change_text = f"{abs(change):.1f} кг"
+                    change_emoji = "🔽"
+                    change_text = f" {change_emoji}{abs(change):.1f} кг"
                 elif change > 0.1:  # Набор веса (>0.1 кг)
-                    emoji = "🔼"
-                    change_text = f"{change:.1f} кг"
+                    change_emoji = "🔼"
+                    change_text = f" {change_emoji}{change:.1f} кг"
                 else:  # Без изменений (±0.1 кг)
-                    emoji = "↕️"
-                    change_text = "без изменений"
+                    change_emoji = "↕️"
+                    change_text = f" {change_emoji}без изменений"
                 
-                response += f"{name}: {weight} кг {emoji}{change_text} (было {prev[0]})\n"
+                if not is_today:
+                    last_date_obj = datetime.datetime.strptime(last_date, "%Y-%m-%d").date()
+                    days_diff = (datetime.date.today() - last_date_obj).days
+                    
+                    if days_diff == 1:
+                        date_info = " (вчера)"
+                    elif days_diff > 1:
+                        date_info = f" ({days_diff} дн. назад)"
+                    else:
+                        date_info = ""
+                    
+                    response += f"{status_emoji} {name}: {weight} кг{date_info}{change_text} (было {prev[0]})\n"
+                else:
+                    response += f"{status_emoji} {name}: {weight} кг{change_text} (было {prev[0]})\n"
             else:
-                # Новый вес (первая запись)
-                response += f"{name}: {weight} кг 🆕\n"
+                if is_today:
+                    response += f"{status_emoji} {name}: {weight} кг 🆕\n"
+                else:
+                    last_date_obj = datetime.datetime.strptime(last_date, "%Y-%m-%d").date()
+                    days_diff = (datetime.date.today() - last_date_obj).days
+                    
+                    if days_diff == 1:
+                        date_info = " (вчера)"
+                    elif days_diff > 1:
+                        date_info = f" ({days_diff} дн. назад)"
+                    else:
+                        date_info = ""
+                    
+                    response += f"{status_emoji} {name}: {weight} кг{date_info} 🆕\n"
         
         await update.message.reply_text(response)
         
     except Exception as e:
         print(f"❌ Ошибка в all_weight: {e}")
-        await update.message.reply_text("❌ Ошибка")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text("❌ Ошибка при получении данных о весе")
 
 async def all_burned(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Все сожженные калории за сегодня"""
