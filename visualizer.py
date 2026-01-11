@@ -3,6 +3,8 @@ import matplotlib.dates as mdates
 from datetime import datetime
 import sqlite3
 import numpy as np
+from datetime import datetime, timedelta
+import matplotlib.patheffects as pe 
 
 class WeightVisualizer:
     def __init__(self, db_path='fitness.db'):
@@ -148,9 +150,131 @@ class WeightVisualizer:
         plt.show()
 
 
-def test():
-    viz = WeightVisualizer()
-    viz.generate_weight_chart()
+class StepsCompetitionVisualizer:
+    def __init__(self, db_path='fitness.db'):
+        self.db_path = db_path
+    
+    def get_steps_competition_data(self, days=30, limit=10):
+        """Возвращает данные для рейтинга: общая сумма / 30 дней"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        today = datetime.now().date()
+        period_start = (today - timedelta(days=days)).isoformat()
+        
+        cursor.execute('''
+            SELECT 
+                u.first_name,
+                SUM(m.steps) as total_steps
+            FROM measurements m
+            JOIN users u ON m.user_id = u.id
+            WHERE m.date >= ? AND m.steps IS NOT NULL
+            GROUP BY u.id
+            HAVING COUNT(m.steps) >= 3
+            ORDER BY SUM(m.steps) DESC
+            LIMIT ?
+        ''', (period_start, limit))
+        
+        competitors = cursor.fetchall()
+        conn.close()
+        
+        if not competitors:
+            return None
+        
+        data = []
+        for name, total_steps in competitors:
+            monthly_avg = total_steps / days
+            
+            data.append({
+                'name': name,
+                'monthly_avg': int(monthly_avg)
+            })
+        
+        data.sort(key=lambda x: x['monthly_avg'], reverse=True)
+        return data
+    
+    def generate_monthly_competition_chart(self):
+        """Чистый график рейтинга"""
+        data = self.get_steps_competition_data(days=30, limit=10)
+        
+        if not data:
+            print("Недостаточно данных за последний месяц (нужно минимум 3 дня активности)")
+            return
+        
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        names = [d['name'] for d in data]
+        monthly_avg = [d['monthly_avg'] for d in data]
+        
+        # Градиент цветов от лучшего к худшему
+        colors = plt.cm.YlOrRd(np.linspace(0.3, 0.9, len(data)))
+        
+        # Создаем бары
+        bars = ax.barh(names, monthly_avg, color=colors, edgecolor='white', linewidth=2, height=0.65)
+        
+        # Находим максимальное значение
+        max_steps = max(monthly_avg)
+        
+        # Добавляем номера мест СЛЕВА (больший отступ)
+        for i, bar in enumerate(bars):
+            y = bar.get_y() + bar.get_height()/2
+            
+            # Номер места слева с большим отступом
+            ax.text(-max_steps * 0.12, y, f'{i+1}.',
+                   va='center', ha='right', fontweight='bold', 
+                   fontsize=13, color='#2C3E50')
+        
+        # Добавляем значения шагов справа от баров
+        for bar, avg in zip(bars, monthly_avg):
+            width = bar.get_width()
+            y = bar.get_y() + bar.get_height()/2
+            
+            # Значение шагов
+            ax.text(width + max_steps * 0.005, y,
+                   f'{avg:,}'.replace(',', ' '),
+                   va='center', fontweight='bold', fontsize=12,
+                   color='#2C3E50')
+        
+        # Настройки графика
+        ax.set_title('🏆 ТОП-10 ПО ШАГАМ ЗА МЕСЯЦ', 
+                    fontsize=16, fontweight='bold', pad=20, color='#2C3E50')
+        
+        # Инвертируем чтобы 1 место было сверху
+        ax.invert_yaxis()
+        
+        # Сетка только по X
+        ax.grid(True, axis='x', alpha=0.2, linestyle='--')
+        
+        # Убираем ненужные рамки
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(True)
+        
+        # Убираем подпись и цифры оси X
+        ax.set_xlabel('')
+        ax.set_xticklabels([])
+        ax.set_xticks([])
+        
+        # Фон
+        ax.set_facecolor('#F8F9FA')
+        fig.patch.set_facecolor('white')
+        
+        plt.tight_layout()
+        plt.show()
+
+
+def test_all_visualizations():
+    print("📊 Генерация графиков...")
+    
+    # 1. График веса
+    print("\n📈 График веса (6+ записей):")
+    WeightVisualizer().generate_weight_chart()
+    
+    # 2. Рейтинг шагов
+    print("\n🏆 Рейтинг шагов (топ-10 за 30 дней):")
+    StepsCompetitionVisualizer().generate_monthly_competition_chart()
+
 
 if __name__ == "__main__":
-    test()
+    test_all_visualizations()
