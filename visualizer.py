@@ -21,7 +21,7 @@ class WeightVisualizer:
                 SELECT COUNT(*) 
                 FROM measurements m 
                 WHERE m.user_id = u.id AND m.weight IS NOT NULL
-            ) >= 6
+            ) >= 7
         ''')
         
         eligible_users = cursor.fetchall()
@@ -42,7 +42,7 @@ class WeightVisualizer:
             
             data_points = cursor.fetchall()
             
-            if len(data_points) >= 6:
+            if len(data_points) >= 7:
                 dates = [datetime.strptime(date_str, "%Y-%m-%d") for date_str, _ in data_points]
                 weights = [weight for _, weight in data_points]
                 
@@ -103,20 +103,20 @@ class WeightVisualizer:
                 markerfacecolor='white',
                 markeredgecolor=color,
                 markeredgewidth=2.5,
-                label=f"{user_data['user_name']} ({user_data['count']} зап.)",
+                label=f"{user_data['user_name']}",
                 color=color,
                 alpha=1.0  # Полная непрозрачность
             )
         
         # Настройка внешнего вида
-        ax.set_title('📈 Динамика веса (пользователи с 6+ записями)', 
+        ax.set_title('Динамика веса', 
                     fontsize=16, fontweight='bold', pad=20, color='#2C3E50')
         
         ax.set_xlabel('Дата', fontsize=12, labelpad=10)
         ax.set_ylabel('Вес (кг)', fontsize=12, labelpad=10)
         
         # Форматирование дат
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m.%y'))
         ax.xaxis.set_major_locator(mdates.AutoDateLocator())
         fig.autofmt_xdate(rotation=45, ha='right')
         
@@ -236,7 +236,7 @@ class StepsCompetitionVisualizer:
                    color='#2C3E50')
         
         # Настройки графика
-        ax.set_title('🏆 ТОП-10 ПО ШАГАМ ЗА МЕСЯЦ', 
+        ax.set_title(' ТОП-10 ПО ШАГАМ', 
                     fontsize=16, fontweight='bold', pad=20, color='#2C3E50')
         
         # Инвертируем чтобы 1 место было сверху
