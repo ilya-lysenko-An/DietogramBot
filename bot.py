@@ -3,13 +3,17 @@ import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import database
+import os 
+from dotenv import load_dotenv 
+
+# Загружаем переменные из .env
+load_dotenv("token.env")
 
 # Логирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота
-TOKEN = "8384396628:AAHcRT21YqN3QLesRVAUk__lDZ972pQTlQw"
+TOKEN = os.getenv("BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
